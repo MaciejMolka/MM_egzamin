@@ -409,7 +409,7 @@ def is_node(wierzcholek, id_budynku, obiekty):
             if intersect(wierzcholek, polygon):
                 ilosc_sasiadow = ilosc_sasiadow + 1
 
-    print(ilosc_sasiadow)
+    return ilosc_sasiadow
 
 def minimal_geometry(feature):
     arcpy.MinimumBoundingGeometry_management(feature, "C:/Studia/PPG_II/Egzamin/Wyniki/rectangle_by_area.shp",
@@ -517,12 +517,8 @@ def main():
     for row in arcpy.da.SearchCursor(warstwa_wejsciowa, ["OID@", "SHAPE@", "gmlId"]):
         id_budynkow.append(row[2])
 
-    iterator = -1
     wyniki = []
     for i in id_budynkow:
-        iterator += 1
-        print(str(iterator) + 'Budynek')
-        print(i)
         wyniki.append(budynek(warstwa_wejsciowa, i))
 
     wynik_ostateczny = []
