@@ -5,19 +5,19 @@ from math import sqrt, acos, pi
 import numpy as np
 import pandas as pd
 
-def tworzenie_warstwy_punktowej(pnts):
+def create_point_feature_class(pnts):
     arcpy.CreateFeatureclass_management("C:/Studia/PPG_II/Egzamin/Wyniki", "Concave_Hull.shp", "POINT")
     cur = arcpy.da.InsertCursor("C:/Studia/PPG_II/Egzamin/Wyniki/Concave_Hull.shp", ["SHAPE@"])
 
-    punkty = []
+    points = []
     for i in pnts:
         for j in i:
-            punkty.append(j)
+            points.append(j)
 
-    for row in punkty:
+    for row in points:
         cur.insertRow([row])
 
-def concave_hull(warstwa_wejsciowa, warstwa_wynikowa, k_pocz=3, pole="", puste=True):
+def concave_hull(input_feature_class, output_feature_class, k_0=3, field_choice="", includenull=True):
     try:
         import arcpy
         import itertools
@@ -186,22 +186,22 @@ def concave_hull(warstwa_wejsciowa, warstwa_wynikowa, k_pocz=3, pole="", puste=T
         #
 
         # Get the input feature class or layer
-        inPoints = warstwa_wejsciowa
+        inPoints = input_feature_class
         inDesc = arcpy.Describe(inPoints)
         inPath = os.path.dirname(inDesc.CatalogPath)
         sR = inDesc.spatialReference
 
         # Get k
-        k = int(k_pocz)
+        k = int(k_0)
         kStart = k
 
         # Get output Feature Class
-        outFC = warstwa_wynikowa
+        outFC = output_feature_class
         outPath = os.path.dirname(outFC)
         outName = os.path.basename(outFC)
 
         # Get case field and ensure it is valid
-        caseField = pole
+        caseField = field_choice
         if caseField > " ":
             fields = inDesc.fields
             for field in fields:
@@ -236,7 +236,7 @@ def concave_hull(warstwa_wejsciowa, warstwa_wynikowa, k_pocz=3, pole="", puste=T
             outCaseField = outCaseField[0:10]  # field names in the output are limited to 10 charaters!
 
         # Get Include Null Geometry Feature flag
-        includeNull = puste
+        includeNull = includenull
 
         # Some housekeeping
         inDesc = arcpy.Describe(inPoints)
@@ -322,94 +322,94 @@ def concave_hull(warstwa_wejsciowa, warstwa_wynikowa, k_pocz=3, pole="", puste=T
         msgs = "GP ERRORS:\n" + arcpy.GetMessages(2) + "\n"
         arcpy.AddError(msgs)
 
-    arcpy.CheckGeometry_management(warstwa_wynikowa, "C:/Studia/PPG_II/Egzamin/Wyniki/spr")
+    arcpy.CheckGeometry_management(output_feature_class, "C:/Studia/PPG_II/Egzamin/Wyniki/spr")
 
     if arcpy.GetCount_management("C:/Studia/PPG_II/Egzamin/Wyniki/spr")[0] == "2":
-        return "Brak"
+        return "Error"
     else:
-        return polygon_do_linii(warstwa_wynikowa)
+        return polygon_to_polyline(output_feature_class)
 
-def geometria_czesci(part, obiekt, sprawdzenie, minimalne_geometrie):
-    nr_punktu = -1
-    wyniki = []
+def part_geometry(part, feature, check, minimal_geometry_list):
+    point_number = -1
+    results = []
     for i in part[0:-1]:
-        nr_punktu += 1
-        punkt_poprzedni = part[0:-1][nr_punktu - 1]
-        punkt_srodkowy = part[0:-1][nr_punktu]
-        if nr_punktu != len(part[0:-1]) - 1:
-            punkt_nastepny = part[0:-1][nr_punktu + 1]
+        point_number += 1
+        point_before = part[0:-1][point_number - 1]
+        point = part[0:-1][point_number]
+        if point_number != len(part[0:-1]) - 1:
+            point_next = part[0:-1][point_number + 1]
         else:
-            punkt_nastepny = part[0:-1][0]
+            point_next = part[0:-1][0]
 
-        length_in = segment_length(punkt_poprzedni, punkt_srodkowy)
-        length_out = segment_length(punkt_nastepny, punkt_srodkowy)
-        angle_in = vertex_angle(punkt_poprzedni, punkt_srodkowy, punkt_nastepny, obiekt, sprawdzenie)
+        length_in = segment_length(point_before, point)
+        length_out = segment_length(point_next, point)
+        angle_in = vertex_angle(point_before, point, point_next, feature, check)
 
-        min_odleglosci = []
-        for i in minimalne_geometrie:
-            if i == "Brak":
-                min_odleglosci.append("Nieokreslone")
+        minimal_distances = []
+        for i in minimal_geometry_list:
+            if i == "Error":
+                minimal_distances.append("Unknown")
             else:
-                min_odleglosci.append(deflection(punkt_srodkowy, i))
+                minimal_distances.append(deflection(point, i))
 
-        wyniki.append(
-            [nr_punktu, length_in, length_out, angle_in, min_odleglosci[0], min_odleglosci[1], min_odleglosci[2],
-             min_odleglosci[3], min_odleglosci[4], min_odleglosci[5]])
+        results.append(
+            [point_number, length_in, length_out, angle_in, minimal_distances[0], minimal_distances[1], minimal_distances[2],
+             minimal_distances[3], minimal_distances[4], minimal_distances[5]])
 
-    return wyniki
+    return results
 
-def geometria_obiektu(parts, obiekt, minimalne_geometrie):
+def feature_geometry(parts, feature, minimalne_geometrie):
     iterator = 0
-    wynik = []
+    intermediate_results = []
     for i in parts:
         iterator += 1
         if iterator == 1:
-            wyniki = geometria_czesci(i, obiekt, 'normalnie', minimalne_geometrie)
-            wynik.append(wyniki)
+            results = part_geometry(i, feature, 'normal', minimalne_geometrie)
+            intermediate_results.append(results)
         else:
             anArray = arcpy.Array()
             for j in i:
                 anArray.add(j)
-            nowy_obiekt = arcpy.Polygon(anArray)
-            wyniki = geometria_czesci(i, nowy_obiekt, 'odwrotnosc', minimalne_geometrie)
-            wynik.append(wyniki)
+            new_feature = arcpy.Polygon(anArray)
+            results = part_geometry(i, new_feature, 'reverse', minimalne_geometrie)
+            intermediate_results.append(results)
 
-    wynik_ostateczny = []
-    for i in wynik:
+    results_2 = []
+    for i in intermediate_results:
         for j in i:
-            wynik_ostateczny.append(j)
+            results_2.append(j)
 
-    return wynik_ostateczny
+    return results_2
 
-def polygon_do_linii(polygon):
+def polygon_to_polyline(polygon):
     arcpy.PolygonToLine_management(polygon, polygon[0:-4] + "_linia.shp")
 
-    linie = []
+    polylines = []
     for row in arcpy.da.SearchCursor(polygon[0:-4] + "_linia.shp", ["SHAPE@"]):
-        linie.append(row[0])
+        polylines.append(row[0])
 
-    return linie[0]
+    return polylines[0]
 
-def deflection(wierzcholek, linia):
-    return linia.distanceTo(wierzcholek)
+def deflection(vertex, polyline):
+    return polyline.distanceTo(vertex)
 
-def intersect(geometria1, geometria2):
-    if not geometria1.disjoint(geometria2):
+def intersect(geom_1, geom_2):
+    if not geom_1.disjoint(geom_2):
         return True
     else:
         return False
 
-def is_node(wierzcholek, id_budynku, obiekty):
-    expression = "gmlID <> " + "'" + id_budynku + "'"
+def is_node(vertex, building_id, features):
+    expression = "gmlID <> " + "'" + building_id + "'"
 
-    ilosc_sasiadow = 0
-    for row in arcpy.da.SearchCursor(obiekty, ["OID@", "SHAPE@", "gmlId"], where_clause=expression):
+    count_of_neighbor_vertex = 0
+    for row in arcpy.da.SearchCursor(features, ["OID@", "SHAPE@", "gmlId"], where_clause=expression):
         for part in row[1]:
             polygon = arcpy.Polygon(part)
-            if intersect(wierzcholek, polygon):
-                ilosc_sasiadow = ilosc_sasiadow + 1
+            if intersect(vertex, polygon):
+                count_of_neighbor_vertex = count_of_neighbor_vertex + 1
 
-    return ilosc_sasiadow
+    return count_of_neighbor_vertex
 
 def minimal_geometry(feature):
     arcpy.MinimumBoundingGeometry_management(feature, "C:/Studia/PPG_II/Egzamin/Wyniki/rectangle_by_area.shp",
@@ -420,117 +420,116 @@ def minimal_geometry(feature):
     arcpy.MinimumBoundingGeometry_management(feature, "C:/Studia/PPG_II/Egzamin/Wyniki/circle.shp", "CIRCLE")
     arcpy.MinimumBoundingGeometry_management(feature, "C:/Studia/PPG_II/Egzamin/Wyniki/envelope.shp", "ENVELOPE")
 
-    lista = [r"C:/Studia/PPG_II/Egzamin/Wyniki/rectangle_by_area.shp",
+    list = [r"C:/Studia/PPG_II/Egzamin/Wyniki/rectangle_by_area.shp",
              r"C:/Studia/PPG_II/Egzamin/Wyniki/rectangle_by_width.shp",
              r"C:/Studia/PPG_II/Egzamin/Wyniki/convex_hull.shp", r"C:/Studia/PPG_II/Egzamin/Wyniki/circle.shp",
              r"C:/Studia/PPG_II/Egzamin/Wyniki/envelope.shp"]
 
-    lista_geometria_polygon = []
-    lista_geometria_linie = []
-    for i in lista:
-        lista_geometria_linie.append(polygon_do_linii(i))
+    polygon_geometry_list = []
+    polyline_geometry_list = []
+    for i in list:
+        polyline_geometry_list.append(polygon_to_polyline(i))
         for row in arcpy.da.SearchCursor(i, ["SHAPE@"]):
-            lista_geometria_polygon.append(row[0])
+            polygon_geometry_list.append(row[0])
 
-    return lista_geometria_linie
+    return polyline_geometry_list
 
-def segment_length(punkt_1, punkt_2):
-    x_1 = punkt_1.X
-    y_1 = punkt_1.Y
+def segment_length(point_1, point_2):
+    x_1 = point_1.X
+    y_1 = point_1.Y
 
-    x_2 = punkt_2.X
-    y_2 = punkt_2.Y
+    x_2 = point_2.X
+    y_2 = point_2.Y
 
     dx = x_2 - x_1
     dy = y_2 - y_1
 
     return sqrt(dx ** 2 + dy ** 2)
 
-def vertex_angle(punkt_1, punkt_2, punkt_3, obiekt, sprawdzenie):
-    a = segment_length(punkt_1, punkt_2)
-    b = segment_length(punkt_2, punkt_3)
-    c = segment_length(punkt_1, punkt_3)
+def vertex_angle(point_1, point_2, point_3, feature, check):
+    a = segment_length(point_1, point_2)
+    b = segment_length(point_2, point_3)
+    c = segment_length(point_1, point_3)
 
     if round(a+b, 10) == round(c, 10):
-        kat = 180
+        angle = 180
     else:
-        kat = acos((a ** 2 + b ** 2 - c ** 2) / (2 * a * b)) * 180 / pi
+        angle = acos((a ** 2 + b ** 2 - c ** 2) / (2 * a * b)) * 180 / pi
 
-        x_1 = punkt_1.X
-        y_1 = punkt_1.Y
+        x_1 = point_1.X
+        y_1 = point_1.Y
 
-        x_3 = punkt_3.X
-        y_3 = punkt_3.Y
+        x_3 = point_3.X
+        y_3 = point_3.Y
 
-        punkt_srodek = arcpy.Point()
-        punkt_srodek.X, punkt_srodek.Y = (x_1 + x_3) / 2, (y_1 + y_3) / 2
+        middle_point = arcpy.Point()
+        middle_point.X, middle_point.Y = (x_1 + x_3) / 2, (y_1 + y_3) / 2
 
-        if sprawdzenie == 'normalnie':
-            if obiekt.disjoint(punkt_srodek):
-                kat = 360 - kat
+        if check == 'normal':
+            if feature.disjoint(middle_point):
+                angle = 360 - angle
             else:
                 pass
         else:
-            if obiekt.disjoint(punkt_srodek):
+            if feature.disjoint(middle_point):
                 pass
             else:
-                kat = 360 - kat
+                angle = 360 - angle
 
-    return kat
+    return angle
 
-def budynek(warstwa_wejsciowa, id_budynku):
-    expression = "gmlID = " + "'" + id_budynku + "'"
+def building(input_feature_class, building_id):
+    expression = "gmlID = " + "'" + building_id + "'"
 
-    for row in arcpy.da.SearchCursor(warstwa_wejsciowa, ["OID@", "SHAPE@", "gmlId"], where_clause=expression):
-        minimalne_geometrie = minimal_geometry(row[1])
-        lista_czesci = []
+    for row in arcpy.da.SearchCursor(input_feature_class, ["OID@", "SHAPE@", "gmlId"], where_clause=expression):
+        minimal_geometry_list = minimal_geometry(row[1])
+        parts_list = []
         for part in row[1]:
-            czesc = []
+            single_part = []
             for pnt in part:
                 if pnt:
-                    czesc.append(pnt)
-                    # is_node(pnt, id_budynku, warstwa_wejsciowa)
+                    single_part.append(pnt)
+                    # is_node(pnt, building_id, input_feature_class)
                 else:
                     trigger = True
-                    lista_czesci.append(czesc)
-                    czesc = []
-            if len(lista_czesci) == 0 or trigger:
+                    parts_list.append(single_part)
+                    single_part = []
+            if len(parts_list) == 0 or trigger:
                 trigger = False
-                lista_czesci.append(czesc)
+                parts_list.append(single_part)
 
-            tworzenie_warstwy_punktowej(lista_czesci)
-            mdb = concave_hull("C:/Studia/PPG_II/Egzamin/Wyniki/Concave_Hull.shp", "C:/Studia/PPG_II/Egzamin/Wyniki/Concave_Hull_wynik.shp")
-            minimalne_geometrie.append(mdb)
-            wyniki = geometria_obiektu(lista_czesci, arcpy.Polygon(part), minimalne_geometrie)
+            create_point_feature_class(parts_list)
+            minimal_geometry_list.append(concave_hull("C:/Studia/PPG_II/Egzamin/Wyniki/Concave_Hull.shp", "C:/Studia/PPG_II/Egzamin/Wyniki/Concave_Hull_wynik.shp"))
+            results = feature_geometry(parts_list, arcpy.Polygon(part), minimal_geometry_list)
 
-    for i in wyniki:
-        i.insert(0, id_budynku)
+    for i in results:
+        i.insert(0, building_id)
 
-    return wyniki
+    return results
 
 def main():
     arcpy.env.overwriteOutput = 1
 
-    warstwa_wejsciowa = r"C:/Studia/PPG_II/Egzamin/Dane/dane/BUBD.shp"
+    input_feature_class = r"C:/Studia/PPG_II/Egzamin/Dane/dane/BUBD.shp"
 
-    id_budynkow = []
-    for row in arcpy.da.SearchCursor(warstwa_wejsciowa, ["OID@", "SHAPE@", "gmlId"]):
-        id_budynkow.append(row[2])
+    building_ids = []
+    for row in arcpy.da.SearchCursor(input_feature_class, ["OID@", "SHAPE@", "gmlId"]):
+        building_ids.append(row[2])
 
-    wyniki = []
-    for i in id_budynkow:
-        wyniki.append(budynek(warstwa_wejsciowa, i))
+    intermediate_results = []
+    for i in building_ids:
+        intermediate_results.append(building(input_feature_class, i))
 
-    wynik_ostateczny = []
-    for i in wyniki:
+    results = []
+    for i in intermediate_results:
         for j in i:
-            wynik_ostateczny.append(j)
+            results.append(j)
 
-    df = pd.DataFrame(np.array(wynik_ostateczny),
-                      columns=['Identyfikator_budynku', 'Wierzcholek', 'Dlugosc_segmentu_przed', 'Dlugosc_segmentu_po',
-                               'kat_wewnetrzny', 'Strzalka_do_boku_RECTANGLE_BY_AREA',
-                               'Strzalka_do_boku_RECTANGLE_BY_WIDTH', 'Strzalka_do_boku_CONVEX_HULL',
-                               'Strzalka_do_boku_CIRCLE', 'Strzalka_do_boku_ENVELOPE', 'Strzalka_do_boku_CONCAVE_HULL'])
+    df = pd.DataFrame(np.array(results),
+                      columns=['gmlid', 'vertex', 'length_in', 'length_out',
+                               'angle_in', 'deflection_to_RECTANGLE_BY_AREA',
+                               'deflection_to_RECTANGLE_BY_WIDTH', 'deflection_to_CONVEX_HULL',
+                               'deflection_to_CIRCLE', 'deflection_to_ENVELOPE', 'deflection_to_CONCAVE_HULL'])
 
     df.to_csv('C:/Users/Admin/Desktop/results.csv', index=False)
 
