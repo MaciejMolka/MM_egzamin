@@ -1,0 +1,50 @@
+Funkcje, które muszą zostać utworzone (nie koniecznie wykorzystane - rozwiązań problemu jest bez liku) w nawiasach podano nazwy funkcji:
+
+1. Długość (segment_length)
+
+2 .Kąt (vertex_angle)
+
+3. Czy wierzchołek jest wezłem sąsiedztwa (podpowiedź zamień X*1000 i Y*1000 na na string (XY) i porównój, selekcja buforem podejżanych) (is_node) return count of neighbor vertex or 0 
+
+4. Strzałka odległośc między linią a punktem (deflection)
+
+5. Przecięcie wynik z macierzy intersekcji dla 2 geometrii (intersect)
+
+6. Funkcja minimalnych otoczek (minimal_geometry): wynik lista 4 minimalych geometrii dla obiektu w kolejności RECTANGLE_BY_AREA, 
+
+RECTANGLE_BY_WIDTH, CONVEX_HULL, CIRCLE (arcpy.MinimumBoundingGeometry_management)
+
+Funkacja na 5.0
+
+7. Funkcja (concave_hull) zwracająca geometrie CONCAVE_HULL. Proszę wykorzystać przesłane w zadaniu narzędzie ConcaveHullByCase opis https://community.esri.com/t5/arcgis-data-interoperability/bruce-harold-s-concave-hull-estimator-tool-enhanced/ba-p/883890 
+
+
+
+Zadanie Egzaminacyjne:
+
+Dla kążdego wierzchołka budynku podać charkaterystykę statystyczną w postaci DataFrame i jego zapis do pliku results.csv.
+
+1. Identyfikator budynku (pole wybrane przez usera {wrtość domyślna: gmlid})
+
+2. Numer kolejny weirzchołka od 0 do n
+
+3. Dugość segmentu przed (length_in)
+
+4. Długośc segmentu po (length_out)
+
+5. Kąt wewnętrzny (angle_in)
+
+6. Strzałka do boku RECTANGLE_BY_AREA
+
+7. Strzałka do boku RECTANGLE_BY_WIDTH
+
+8. Strzałka do boku CONVEX_HULL
+
+9. Strzałka do boku CIRCLE
+
+10. Strzałka do boku ENVELOPE
+
+11. Strzałka do boku CONCAVE_HULL
+
+
+
